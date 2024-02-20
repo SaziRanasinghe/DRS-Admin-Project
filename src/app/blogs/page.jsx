@@ -1,17 +1,24 @@
 'use client'
 import * as React from 'react';
-import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import { useEffect, useState } from 'react';
 import Typography from '@mui/material/Typography';
-import SendIcon from '@mui/icons-material/Send';
 import Autocomplete from '@mui/material/Autocomplete';
-import { ref, push, set, get } from 'firebase/database';
 import database from '../component/FirebaseConfig/FirebaseConfig';
 import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 import Button from '@mui/material/Button';
-  
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogActions from '@mui/material/DialogActions';
+import Accordion from '@mui/material/Accordion';
+import AccordionActions from '@mui/material/AccordionActions';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import { ref, push, set, get, update, remove } from 'firebase/database';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
  
   function Blogs (){
       let [title, setTitle] = useState('');
@@ -19,6 +26,9 @@ import Button from '@mui/material/Button';
       let [categories, setCategories] = useState([]);
       let [selectedCategory, setSelectedCategory] = useState(null);
       let [blogs, setBlogs] = useState([]);
+      let [editingIndex, setEditingIndex] = useState(null);
+      const [editedDescription, setEditedDescription] = useState('');
+      const [editedTitle, setEditedTitle] = useState("");
 
       useEffect(() => {
         const categoriesRef = ref(database, 'category');
@@ -58,8 +68,10 @@ import Button from '@mui/material/Button';
       let isNullorWhiteSpaces = value => {
         value = value.toString();
         return (value == null || value.replaceAll(' ','').length < 1);
-      }
-    
+      };
+      
+
+     
     //add blogs
     const SubmitData = () => {
       if (isNullorWhiteSpaces(title) || isNullorWhiteSpaces(description) ) {
@@ -73,7 +85,7 @@ import Button from '@mui/material/Button';
       const blogData = {
         title: title,
         description: description,
-        category: selectedCategory.name // Assuming you want to save the category name
+        category: selectedCategory.name  
       };
     
       set(newBlogRef, blogData);
@@ -90,11 +102,63 @@ import Button from '@mui/material/Button';
     
       setTitle('');
       setDescription('');
-      setSelectedCategory(null); // Clear selected category after submission
+      setSelectedCategory(null);  
     };
     
   
+    const deleteBlog = (index, blogId) => {
+      const blogRef = ref(database, `blog/${blogId}`);
+      remove(blogRef);
+
+      
+        
   
+      setBlogs((prevBlogs) => {
+        const updatedBlogs = [...prevBlogs];
+        updatedBlogs.splice(index, 1);
+        
+
+        return updatedBlogs;
+      });
+    };
+
+    
+  
+    const startEditing = (index, initialTitle, initialDescription) => {
+      setEditingIndex(index);
+      setEditedTitle(initialTitle);
+      setEditedDescription(initialDescription);
+    };
+  
+    const cancelEditing = () => {
+      setEditingIndex(null);
+      setEditedDescription('');
+    };
+  
+   
+      
+        const updateTitleAndDescription = (index, blogId) => {
+          if (isNullorWhiteSpaces(editedTitle) || 
+          isNullorWhiteSpaces(editedDescription)) {
+            alert("Title and description cannot be empty");
+            return;
+          }
+  
+      const blogRef = ref(database, `blog/${blogId}`);
+      update(blogRef, {
+        description: editedDescription,
+      });
+  
+      setBlogs((prevBlogs) => {
+        const updatedBlogs = [...prevBlogs];
+        updatedBlogs[index].description = editedDescription;
+        return updatedBlogs;
+      });
+  
+      setEditingIndex(null);
+      setEditedDescription("");
+      setEditedTitle("");
+    };
   
 
 
@@ -110,17 +174,21 @@ import Button from '@mui/material/Button';
   
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        '& > :not(style)': {
-          margin: 10,
-        },
-      }}
-    >
-      <TextField
+
+   
+    <React.Fragment>
+
+  {/* add blog button  */}
+  <Button variant="outlined" style={{ "margin": "20px" }} onClick={handleClickOpen}>
+        Add Blogs
+      </Button>
+
+
+      <Dialog open={open} onClose={handleClose}>
+        <DialogTitle>Blog Details</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+          <TextField
         id="outlined-basic"
         label="Add Title"
         variant="outlined"
@@ -153,19 +221,81 @@ import Button from '@mui/material/Button';
           setDescription(data);
         }}
       />
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+        <Button
+ 
+         
+ onClick={SubmitData}
+>
+ Save
+</Button>
+          <Button onClick={handleClose} color="primary">
+            Close
+          </Button>
 
-      <Button
-        variant="contained"
-        style={{
-          alignSelf: 'flex-end',
-          marginTop: '20px',
-        }}
-        endIcon={<SendIcon />}
-        onClick={SubmitData}
-      >
-        Send
-      </Button>
-    </Box>
+        </DialogActions>
+      </Dialog>
+
+      {blogs.map((blog, i) => (
+        <Accordion key={i} style={{ "margin-left": "20px", "margin-right": "20px" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            {editingIndex === i ? (
+              <div>
+                <input
+             type="text"
+             value={editedTitle}
+             onChange={(e) => setEditedTitle(e.target.value)}
+             />
+
+ 
+                <input
+                  type="text"
+                  value={editedDescription}
+                  onChange={(e) => setEditedDescription(e.target.value)}
+                />
+ 
+ 
+          
+      
+              </div>
+          ) : (
+            <> 
+            <Typography>{blog.title}</Typography>
+             
+            </>
+          )}
+        </AccordionSummary>
+        <AccordionDetails>
+       {/* Display the blog description */}
+       <Typography
+         dangerouslySetInnerHTML={{
+           __html: editingIndex === i ? editedDescription : blog.description,
+         }}
+       />
+     </AccordionDetails>
+     
+          <AccordionActions>
+            {editingIndex === i ? (
+              <>
+                <Button onClick={() => updateTitleAndDescription(i, blog.id)}>Save</Button>
+                <Button onClick={cancelEditing}>Cancel</Button>
+              </>
+            ) : (
+              <>
+                <Button onClick={() => startEditing(i, blog.title, blog.description)}>Edit</Button>
+                <Button onClick={() => deleteBlog(i, blog.id)} color="error">Delete</Button>
+              </>
+            )}
+          </AccordionActions>
+        </Accordion>
+      ))}
+       
+       
+
+     
+   </React.Fragment> 
   );
 }
 
